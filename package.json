@@ -1,0 +1,19 @@
+{
+	"name": "obsidian-todo-sidebar",
+	"version": "1.0.0",
+	"description": "A sidebar panel that shows all your vault's todo tasks.",
+	"main": "main.js",
+	"scripts": {
+		"dev": "node esbuild.config.mjs",
+		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production"
+	},
+	"keywords": [],
+	"author": "zh",
+	"license": "MIT",
+	"devDependencies": {
+		"@types/node": "^22.15.21",
+		"esbuild": "0.25.5",
+		"obsidian": "latest",
+		"typescript": "^5.8.3"
+	}
+}

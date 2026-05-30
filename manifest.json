@@ -1,0 +1,9 @@
+{
+	"id": "obsidian-todo-sidebar",
+	"name": "Todo Sidebar",
+	"version": "1.0.0",
+	"minAppVersion": "0.15.0",
+	"description": "A sidebar panel that shows all your vault's todo tasks, inspired by Claudian.",
+	"author": "zh",
+	"isDesktopOnly": false
+}
