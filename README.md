@@ -29,6 +29,8 @@ npm run dev    # 开发模式，自动监听
 npm run build  # 类型检查 + 生产构建（输出 main.js）
 ```
 
+发版：`git tag v2.0.x && git push origin v2.0.x`，CI 会自动构建并把 `main.js`、`manifest.json`、`styles.css` 上传到 Release。
+
 构建产物 `main.js` 不入库（.gitignore）；`legacy/` 里保存的是移植前手写演进的 v2 原始 JS，仅作历史参考。
 
 ## 任务格式
