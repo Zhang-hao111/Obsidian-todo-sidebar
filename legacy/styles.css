@@ -1,0 +1,637 @@
+/* ============================================================
+   Todo Sidebar v2 — macOS 风格
+   圆形勾选框 / 卡片 / 分段选项卡 / 幽灵图标按钮
+   颜色全部走 Obsidian 主题变量，深浅色、换主题都适配
+   ============================================================ */
+
+.todo-sidebar-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 16px 14px 8px;
+  overflow: hidden;
+  font-family: var(--font-interface);
+}
+
+/* ---------- 顶行 ---------- */
+
+.todo-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin: 0 2px 12px;
+}
+
+.todo-header-title {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.todo-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  color: var(--text-normal);
+}
+
+.todo-header-subtitle {
+  font-size: 11.5px;
+  line-height: 1.3;
+  color: var(--text-faint);
+}
+
+.todo-header-subtitle .is-overdue {
+  color: #ff3b30;
+}
+
+.todo-header-subtitle .is-today {
+  color: #0a84ff;
+}
+
+.todo-header-actions {
+  display: flex;
+  gap: 2px;
+  margin-top: 1px;
+}
+
+.todo-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.todo-icon-btn svg {
+  width: 15px;
+  height: 15px;
+}
+
+.todo-icon-btn:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.todo-icon-btn.is-active {
+  background-color: rgba(10, 132, 255, 0.12);
+  color: var(--interactive-accent);
+}
+
+.todo-icon-btn.is-danger:hover {
+  background-color: rgba(255, 59, 48, 0.12);
+  color: #ff3b30;
+}
+
+/* ---------- 搜索 ---------- */
+
+.todo-search {
+  position: relative;
+  margin-bottom: 10px;
+  animation: todo-search-in 0.15s ease-out;
+}
+
+@keyframes todo-search-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.todo-search input {
+  width: 100%;
+  padding: 5px 10px 5px 30px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  background-color: var(--background-primary);
+  color: var(--text-normal);
+  font-size: 12.5px;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.todo-search input:focus {
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.18);
+}
+
+.todo-search-icon {
+  position: absolute;
+  left: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-faint);
+  display: flex;
+  pointer-events: none;
+}
+
+.todo-search-icon svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* ---------- 分段选项卡（macOS segmented control） ---------- */
+
+.todo-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  margin-bottom: 12px;
+  border-radius: 9px;
+  background-color: var(--background-secondary-alt);
+}
+
+.todo-tab {
+  flex: 1;
+  padding: 4px 0;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s ease;
+}
+
+.todo-tab:hover {
+  color: var(--text-normal);
+}
+
+.todo-tab.active {
+  background-color: var(--background-primary);
+  color: var(--text-normal);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14);
+}
+
+/* ---------- 列表 ---------- */
+
+.todo-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 2px 8px;
+}
+
+.todo-empty {
+  padding: 40px 16px;
+  text-align: center;
+  color: var(--text-faint);
+  font-size: 13px;
+}
+
+/* ---------- 日期分组 ---------- */
+
+.todo-group {
+  margin-bottom: 18px;
+}
+
+.todo-group-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 2px 2px 7px;
+}
+
+.todo-group-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: var(--text-muted);
+}
+
+.todo-group-header.is-overdue .todo-group-label {
+  color: #ff3b30;
+}
+
+.todo-group-count {
+  padding: 0 7px;
+  border-radius: 9px;
+  background-color: var(--background-modifier-border);
+  color: var(--text-muted);
+  font-size: 10.5px;
+  line-height: 16px;
+}
+
+/* ---------- 任务卡片 ---------- */
+
+.todo-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 12px;
+  background-color: var(--background-primary);
+  transition: box-shadow 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.todo-card:hover {
+  border-color: var(--background-modifier-border-hover);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-1px);
+}
+
+.todo-card.is-done {
+  opacity: 0.55;
+}
+
+/* ---------- 圆形勾选框（macOS 提醒事项风） ---------- */
+
+.todo-check {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  margin-top: 2px;
+  border: 1.5px solid var(--text-faint);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.todo-check:hover {
+  border-color: var(--interactive-accent);
+}
+
+.todo-check svg {
+  width: 10px;
+  height: 10px;
+  color: var(--text-on-accent);
+  opacity: 0;
+  transform: scale(0.4);
+  transition: all 0.15s ease;
+}
+
+.todo-check.is-checked {
+  background-color: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+}
+
+.todo-check.is-checked svg {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* ---------- 卡片内容 ---------- */
+
+.todo-content {
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.todo-title-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.todo-title {
+  flex: 1;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--text-normal);
+  word-break: break-word;
+}
+
+.todo-card.is-done .todo-title {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.todo-priority-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.todo-date-pill {
+  flex: none;
+  padding: 1px 8px;
+  border-radius: 10px;
+  background-color: var(--background-secondary-alt);
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 17px;
+}
+
+.todo-date-pill.is-today {
+  background-color: rgba(10, 132, 255, 0.14);
+  color: #0a84ff;
+}
+
+.todo-date-pill.is-overdue {
+  background-color: rgba(255, 59, 48, 0.12);
+  color: #ff3b30;
+}
+
+.todo-desc {
+  margin-top: 3px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.todo-source {
+  margin-top: 4px;
+  font-size: 10.5px;
+  color: var(--text-faint);
+}
+
+/* ---------- 悬浮操作 ---------- */
+
+.todo-actions {
+  flex: none;
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.todo-card:hover .todo-actions {
+  opacity: 1;
+}
+
+.todo-actions .todo-icon-btn {
+  width: 24px;
+  height: 24px;
+}
+
+.todo-actions .todo-icon-btn svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* ---------- 弹窗 ---------- */
+
+.todo-modal h2 {
+  margin-top: 0;
+}
+
+.todo-modal textarea {
+  width: 100%;
+  min-height: 72px;
+  resize: vertical;
+  font-family: var(--font-interface);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.todo-date-clear-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  margin-left: 6px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.todo-date-clear-btn svg {
+  width: 13px;
+  height: 13px;
+}
+
+.todo-date-clear-btn:hover {
+  color: #ff3b30;
+  background-color: var(--background-modifier-hover);
+}
+
+.todo-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 14px;
+}
+
+.todo-modal-actions button {
+  padding: 6px 16px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 7px;
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.todo-modal-actions button:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.todo-modal-actions button.mod-cta {
+  background: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.todo-modal-actions button.mod-cta:hover {
+  opacity: 0.88;
+}
+
+.todo-modal-actions button.mod-warning {
+  background: #ff3b30;
+  border-color: #ff3b30;
+  color: #fff;
+}
+
+.todo-modal-actions button.mod-warning:hover {
+  opacity: 0.88;
+}
+
+/* ---------- 日期输入框（触发自定义日历） ---------- */
+
+.todo-date-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.todo-date-field input {
+  width: 148px;
+  padding-left: 28px;
+  cursor: pointer;
+}
+
+.todo-date-field-icon {
+  position: absolute;
+  left: 9px;
+  display: flex;
+  color: var(--text-faint);
+  pointer-events: none;
+}
+
+.todo-date-field-icon svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* ---------- macOS 风日历弹层 ---------- */
+
+.todo-datepicker {
+  position: fixed;
+  z-index: 1000;
+  width: 236px;
+  padding: 10px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 13px;
+  background-color: var(--background-primary);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.18);
+  user-select: none;
+  animation: todo-datepicker-in 0.12s ease-out;
+}
+
+@keyframes todo-datepicker-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.todo-datepicker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  padding: 0 2px;
+}
+
+.todo-datepicker-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-normal);
+}
+
+.todo-datepicker-nav {
+  display: flex;
+  gap: 2px;
+}
+
+.todo-datepicker-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.todo-datepicker-nav-btn:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.todo-datepicker-nav svg {
+  width: 14px;
+  height: 14px;
+}
+
+.todo-datepicker-weekdays,
+.todo-datepicker-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.todo-datepicker-weekdays {
+  margin-bottom: 2px;
+}
+
+.todo-datepicker-weekdays span {
+  padding: 2px 0;
+  text-align: center;
+  font-size: 10.5px;
+  color: var(--text-faint);
+}
+
+.todo-datepicker-day {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-normal);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.todo-datepicker-day:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.todo-datepicker-day.is-out {
+  color: var(--text-faint);
+  opacity: 0.45;
+}
+
+.todo-datepicker-day.is-today {
+  color: var(--interactive-accent);
+  font-weight: 700;
+}
+
+.todo-datepicker-day.is-selected,
+.todo-datepicker-day.is-selected:hover {
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+  font-weight: 600;
+}
+
+.todo-datepicker-footer {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.todo-datepicker-footer-btn {
+  padding: 2px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--interactive-accent);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.todo-datepicker-footer-btn:hover {
+  background-color: var(--background-modifier-hover);
+}
