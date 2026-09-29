@@ -1,9 +1,9 @@
 {
 	"id": "obsidian-todo-sidebar",
 	"name": "Todo Sidebar",
-	"version": "1.0.0",
+	"version": "2.0.0",
 	"minAppVersion": "0.15.0",
-	"description": "A sidebar panel that shows all your vault's todo tasks, inspired by Claudian.",
+	"description": "侧边栏待办面板：日期分组、优先级、详细描述、搜索、编辑删除、已完成归档，macOS 风格界面。",
 	"author": "zh",
 	"isDesktopOnly": false
 }

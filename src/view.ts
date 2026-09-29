@@ -1,19 +1,33 @@
-import { ItemView, TFile, WorkspaceLeaf, moment } from "obsidian";
+import { ItemView, Notice, WorkspaceLeaf, moment, setIcon } from "obsidian";
+import type TodoSidebarPlugin from "./main";
+import {
+	parseTasksInContent,
+	sortTasks,
+	buildTaskLines,
+	PRIORITIES,
+	type TabKey,
+	type TodoTask,
+	type TaskDraft,
+} from "./task";
 
 export const VIEW_TYPE_TODO_SIDEBAR = "todo-sidebar-view";
 
-export interface TodoTask {
-	text: string;
-	date: string;
-	file: TFile;
-	line: number;
-	checked: boolean;
-	rawText: string;
-}
+const TAB_LABELS: Record<TabKey, string> = {
+	"has-date": "有日期",
+	"no-date": "无日期",
+	done: "已完成",
+};
 
 export class TodoSidebarView extends ItemView {
+	private plugin: TodoSidebarPlugin;
 	private tasks: TodoTask[] = [];
-	private selectedDate: string = "has-date";
+	private query = "";
+	private searchOpen = false;
+
+	constructor(leaf: WorkspaceLeaf, plugin: TodoSidebarPlugin) {
+		super(leaf);
+		this.plugin = plugin;
+	}
 
 	getViewType(): string {
 		return VIEW_TYPE_TODO_SIDEBAR;
@@ -36,227 +50,311 @@ export class TodoSidebarView extends ItemView {
 	async refreshTasks(): Promise<void> {
 		this.tasks = [];
 		const files = this.app.vault.getMarkdownFiles();
-
 		for (const file of files) {
 			const content = await this.app.vault.cachedRead(file);
-			const lines = content.split("\n");
-
-			for (let i = 0; i < lines.length; i++) {
-				const match = lines[i].match(
-					/^(\s*)[-*]\s+\[([ xX])\]\s+(.*?)(?:\s+📅\s+(\d{4}-\d{2}-\d{2}))?\s*$/
-				);
-				if (match) {
-					const date = match[4] || "无日期";
-					this.tasks.push({
-						text: match[3].trim(),
-						date,
-						file,
-						line: i,
-						checked: match[2] !== " ",
-						rawText: lines[i],
-					});
-				}
-			}
+			this.tasks.push(...parseTasksInContent(content, file));
 		}
-
 		this.render();
 	}
 
-	private getDateKeys(): string[] {
-		const dateSet = new Set<string>();
-		for (const t of this.tasks) {
-			dateSet.add(t.date);
-		}
-		const dates = Array.from(dateSet);
-		const realDates = dates
-			.filter((d) => d !== "无日期")
-			.sort((a, b) => a.localeCompare(b));
-		const noDate = dates.includes("无日期") ? ["无日期"] : [];
-		return [...realDates, ...noDate];
+	private iconButton(parent: HTMLElement, icon: string, label: string): HTMLButtonElement {
+		const btn = parent.createEl("button", {
+			cls: "todo-icon-btn",
+			attr: { "aria-label": label },
+		});
+		setIcon(btn, icon);
+		return btn;
 	}
 
+	/* ---------- 渲染骨架 ---------- */
+
 	private render(): void {
-		const container = this.containerEl.children[1];
+		const container = this.containerEl.children[1] as HTMLElement;
 		container.empty();
 		container.addClass("todo-sidebar-container");
 
-		// Header
-		const header = container.createDiv({ cls: "todo-sidebar-header" });
-		header.createEl("h3", { text: "待办任务" });
-
+		// 头部：标题 + 摘要小字，右侧是搜索开关 / 新建 / 刷新
+		const header = container.createDiv({ cls: "todo-header" });
+		const titleBox = header.createDiv({ cls: "todo-header-title" });
+		titleBox.createEl("h3", { text: "待办任务" });
+		this.renderSummary(titleBox);
 		const headerActions = header.createDiv({ cls: "todo-header-actions" });
-
-		const addBtn = headerActions.createEl("button", {
-			cls: "todo-sidebar-btn",
-			attr: { "aria-label": "新建待办" },
+		const searchBtn = this.iconButton(headerActions, "search", "搜索");
+		if (this.searchOpen) searchBtn.addClass("is-active");
+		searchBtn.addEventListener("click", () => {
+			this.searchOpen = !this.searchOpen;
+			if (!this.searchOpen) this.query = "";
+			this.render();
+			if (this.searchOpen) {
+				setTimeout(() => {
+					const input = this.containerEl.querySelector(
+						".todo-search input"
+					) as HTMLInputElement | null;
+					if (input) input.focus();
+				}, 30);
+			}
 		});
-		addBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>`;
-		addBtn.addEventListener("click", () => {
-			(this.app as any).commands?.executeCommandById?.("obsidian-todo-sidebar:add-todo");
-		});
-
-		const refreshBtn = headerActions.createEl("button", {
-			cls: "todo-sidebar-btn",
-			attr: { "aria-label": "刷新" },
-		});
-		refreshBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>`;
+		const addBtn = this.iconButton(headerActions, "plus", "新建待办");
+		addBtn.addEventListener("click", () => this.plugin.openTaskModal(null, this));
+		const refreshBtn = this.iconButton(headerActions, "refresh-cw", "刷新");
 		refreshBtn.addEventListener("click", () => this.refreshTasks());
 
-		// Date filter row
-		const dateRow = container.createDiv({ cls: "todo-date-row" });
-		const dateKeys = this.getDateKeys();
-
-		const makeDateBtn = (key: string, label: string) => {
-			const count = (
-				key === "has-date"
-					? this.tasks.filter((t) => t.date !== "无日期")
-					: this.tasks.filter((t) => t.date === key)
-			).length;
-			const btn = dateRow.createEl("button", {
-				cls: `todo-date-btn ${this.selectedDate === key ? "active" : ""}`,
-				text: `${label} ${count}`,
+		// 搜索（默认收起，点放大镜展开，Esc 收起）
+		if (this.searchOpen) {
+			const searchWrap = container.createDiv({ cls: "todo-search" });
+			const searchIcon = searchWrap.createSpan({ cls: "todo-search-icon" });
+			setIcon(searchIcon, "search");
+			const searchInput = searchWrap.createEl("input", {
+				attr: { type: "text", placeholder: "搜索任务或描述…" },
 			});
-			btn.addEventListener("click", () => {
-				this.selectedDate = key;
-				this.render();
+			searchInput.value = this.query;
+			searchInput.addEventListener("input", () => {
+				this.query = searchInput.value;
+				this.renderList(listEl);
 			});
-		};
-
-		makeDateBtn("has-date", "有日期");
-
-		for (const dateKey of dateKeys) {
-			const label = dateKey === "无日期" ? "无日期" : this.formatDateShort(dateKey);
-			const count = this.tasks.filter((t) => t.date === dateKey).length;
-			const btn = dateRow.createEl("button", {
-				cls: `todo-date-btn ${this.selectedDate === dateKey ? "active" : ""}`,
-				text: `${label} ${count}`,
-			});
-			btn.addEventListener("click", () => {
-				this.selectedDate = dateKey;
-				this.render();
-			});
-		}
-
-		// Task list
-		const list = container.createDiv({ cls: "todo-sidebar-list" });
-
-		let filtered = this.tasks;
-
-		if (this.selectedDate === "has-date") {
-			filtered = filtered.filter((t) => t.date !== "无日期");
-		} else {
-			filtered = filtered.filter((t) => t.date === this.selectedDate);
-		}
-
-		if (filtered.length === 0) {
-			list.createDiv({ cls: "todo-empty", text: "没有待办任务" });
-			return;
-		}
-
-		// Group by date
-		const grouped = new Map<string, TodoTask[]>();
-		for (const task of filtered) {
-			if (!grouped.has(task.date)) grouped.set(task.date, []);
-			grouped.get(task.date)!.push(task);
-		}
-
-		const sortedDates = Array.from(grouped.keys()).sort((a, b) => {
-			if (a === "无日期") return 1;
-			if (b === "无日期") return -1;
-			return a.localeCompare(b);
-		});
-
-		for (const dateKey of sortedDates) {
-			const tasks = grouped.get(dateKey)!;
-			this.renderDateGroup(list, dateKey, tasks);
-		}
-	}
-
-	private renderDateGroup(
-		container: Element,
-		dateKey: string,
-		tasks: TodoTask[]
-	): void {
-		const dateGroup = container.createDiv({ cls: "todo-date-group" });
-		const dateHeader = dateGroup.createDiv({ cls: "todo-date-header" });
-
-		const dateLabel =
-			dateKey === "无日期" ? "无日期" : this.formatDateDisplay(dateKey);
-		dateHeader.createSpan({ cls: "todo-date-label", text: dateLabel });
-		dateHeader.createSpan({
-			cls: "todo-date-count",
-			text: `${tasks.filter((t) => !t.checked).length}/${tasks.length}`,
-		});
-
-		for (const task of tasks) {
-			const item = dateGroup.createDiv({
-				cls: `todo-item ${task.checked ? "todo-done" : ""}`,
-			});
-
-			const checkbox = item.createEl("input", {
-				type: "checkbox",
-				cls: "todo-checkbox",
-			});
-			checkbox.checked = task.checked;
-			checkbox.addEventListener("change", async () => {
-				await this.toggleTask(task);
-			});
-
-			const textEl = item.createDiv({ cls: "todo-text" });
-			textEl.setText(task.text);
-
-			const fileTag = item.createDiv({ cls: "todo-file-tag" });
-			fileTag.setText(task.file.basename);
-
-			item.addEventListener("click", (e) => {
-				if ((e.target as HTMLElement).tagName !== "INPUT") {
-					this.openTaskFile(task);
+			searchInput.addEventListener("keydown", (e) => {
+				if (e.key === "Escape") {
+					e.stopPropagation();
+					if (this.query) {
+						this.query = "";
+						searchInput.value = "";
+						this.renderList(listEl);
+					} else {
+						this.searchOpen = false;
+						this.render();
+					}
 				}
 			});
 		}
+
+		// 分段选项卡
+		const tab = this.plugin.settings.selectedTab;
+		const counts: Record<TabKey, number> = {
+			"has-date": this.tasks.filter((t) => !t.checked && t.date).length,
+			"no-date": this.tasks.filter((t) => !t.checked && !t.date).length,
+			done: this.tasks.filter((t) => t.checked).length,
+		};
+		const tabs = container.createDiv({ cls: "todo-tabs" });
+		for (const key of Object.keys(TAB_LABELS) as TabKey[]) {
+			const btn = tabs.createEl("button", {
+				cls: `todo-tab ${tab === key ? "active" : ""}`,
+				text: `${TAB_LABELS[key]} ${counts[key]}`,
+			});
+			btn.addEventListener("click", async () => {
+				this.plugin.settings.selectedTab = key;
+				await this.plugin.saveSettings();
+				this.render();
+			});
+		}
+
+		const listEl = container.createDiv({ cls: "todo-list" });
+		this.renderList(listEl);
 	}
+
+	// 标题下的摘要小字：N 项未完成 · N 已过期 / N 今天到期
+	private renderSummary(parent: HTMLElement): void {
+		const open = this.tasks.filter((t) => !t.checked);
+		const today = moment().format("YYYY-MM-DD");
+		const overdue = open.filter((t) => t.date && t.date < today).length;
+		const dueToday = open.filter((t) => t.date === today).length;
+		const sub = parent.createDiv({ cls: "todo-header-subtitle" });
+		sub.createSpan({ text: `${open.length} 项未完成` });
+		if (overdue > 0) {
+			sub.createSpan({ cls: "is-overdue", text: ` · ${overdue} 已过期` });
+		} else if (dueToday > 0) {
+			sub.createSpan({ cls: "is-today", text: ` · ${dueToday} 今天到期` });
+		}
+	}
+
+	private filteredTasks() {
+		const tab = this.plugin.settings.selectedTab;
+		let list = this.tasks;
+		if (tab === "done") list = list.filter((t) => t.checked);
+		else if (tab === "no-date") list = list.filter((t) => !t.checked && !t.date);
+		else list = list.filter((t) => !t.checked && t.date);
+
+		const q = this.query.trim().toLowerCase();
+		if (q) {
+			list = list.filter(
+				(t) =>
+					t.text.toLowerCase().includes(q) ||
+					(t.description && t.description.toLowerCase().includes(q))
+			);
+		}
+		return list;
+	}
+
+	private renderList(listEl: HTMLElement): void {
+		listEl.empty();
+		const tab = this.plugin.settings.selectedTab;
+		const tasks = this.filteredTasks();
+
+		if (tasks.length === 0) {
+			const text = this.query
+				? "没有匹配的任务"
+				: tab === "done"
+				? "还没有已完成的任务"
+				: "没有待办任务";
+			listEl.createDiv({ cls: "todo-empty", text });
+			return;
+		}
+
+		if (tab === "has-date") {
+			const grouped = new Map<string, TodoTask[]>();
+			for (const t of tasks) {
+				if (!grouped.has(t.date!)) grouped.set(t.date!, []);
+				grouped.get(t.date!)!.push(t);
+			}
+			const today = moment().format("YYYY-MM-DD");
+			for (const d of [...grouped.keys()].sort()) {
+				const overdue = d < today;
+				const group = listEl.createDiv({ cls: "todo-group" });
+				const gh = group.createDiv({
+					cls: `todo-group-header ${overdue ? "is-overdue" : ""}`,
+				});
+				gh.createSpan({
+					cls: "todo-group-label",
+					text: this.formatDateDisplay(d, overdue),
+				});
+				gh.createSpan({
+					cls: "todo-group-count",
+					text: String(grouped.get(d)!.length),
+				});
+				for (const t of sortTasks(grouped.get(d)!)) this.renderTask(group, t);
+			}
+		} else {
+			for (const t of sortTasks(tasks)) this.renderTask(listEl, t);
+		}
+	}
+
+	private renderTask(parent: HTMLElement, task: TodoTask): void {
+		const card = parent.createDiv({
+			cls: `todo-card ${task.checked ? "is-done" : ""}`,
+		});
+
+		// 圆形勾选框（macOS 提醒事项风）
+		const check = card.createSpan({
+			cls: `todo-check ${task.checked ? "is-checked" : ""}`,
+			attr: { role: "checkbox", "aria-checked": String(task.checked) },
+		});
+		setIcon(check, "check");
+		check.addEventListener("click", async (e) => {
+			e.stopPropagation();
+			await this.toggleTask(task);
+		});
+
+		// 内容区（点击跳转到笔记对应行）
+		const content = card.createDiv({ cls: "todo-content" });
+		content.addEventListener("click", () => this.openTaskFile(task));
+
+		const titleRow = content.createDiv({ cls: "todo-title-row" });
+		titleRow.createSpan({ cls: "todo-title", text: task.text });
+
+		if (task.priority) {
+			const p = PRIORITIES.find((x) => x.key === task.priority);
+			if (p) {
+				const dot = titleRow.createSpan({ cls: "todo-priority-dot" });
+				dot.style.backgroundColor = p.color;
+				dot.setAttr("title", `优先级：${p.label}`);
+			}
+		}
+
+		if (task.date) {
+			const today = moment().format("YYYY-MM-DD");
+			let cls = "todo-date-pill";
+			if (task.date < today && !task.checked) cls += " is-overdue";
+			else if (task.date === today) cls += " is-today";
+			titleRow.createSpan({ cls, text: this.formatDateShort(task.date) });
+		}
+
+		if (task.description) {
+			content.createDiv({ cls: "todo-desc", text: task.description });
+		}
+
+		content.createDiv({ cls: "todo-source", text: task.file.basename });
+
+		// 悬浮操作按钮
+		const actions = card.createDiv({ cls: "todo-actions" });
+		const editBtn = this.iconButton(actions, "pencil", "编辑");
+		editBtn.addEventListener("click", (e) => {
+			e.stopPropagation();
+			this.plugin.openTaskModal(task, this);
+		});
+		const delBtn = this.iconButton(actions, "trash-2", "删除");
+		delBtn.addClass("is-danger");
+		delBtn.addEventListener("click", (e) => {
+			e.stopPropagation();
+			this.plugin.confirmDelete(task, () => this.deleteTask(task));
+		});
+	}
+
+	/* ---------- 日期显示 ---------- */
 
 	private formatDateShort(dateStr: string): string {
 		const m = moment(dateStr, "YYYY-MM-DD");
 		const today = moment();
 		if (m.isSame(today, "day")) return "今天";
-		if (m.isSame(today.clone().subtract(1, "day"), "day")) return "昨天";
 		if (m.isSame(today.clone().add(1, "day"), "day")) return "明天";
-		return m.format("MM/DD");
+		if (m.isSame(today.clone().subtract(1, "day"), "day")) return "昨天";
+		return m.format("MM-DD");
 	}
 
-	private formatDateDisplay(dateStr: string): string {
+	private formatDateDisplay(dateStr: string, overdue: boolean): string {
 		const m = moment(dateStr, "YYYY-MM-DD");
-		const label = this.formatDateShort(dateStr);
 		const weekday = ["日", "一", "二", "三", "四", "五", "六"][m.day()];
-		if (label === "今天" || label === "昨天" || label === "明天") {
-			return `${label} · 周${weekday}`;
-		}
-		return `${m.format("YYYY-MM-DD")} · 周${weekday}`;
+		const short = this.formatDateShort(dateStr);
+		let label = ["今天", "明天", "昨天"].includes(short)
+			? `${short} · 周${weekday}`
+			: `${m.format("YYYY-MM-DD")} · 周${weekday}`;
+		if (overdue) label += " · 已过期";
+		return label;
 	}
+
+	/* ---------- 文件写回 ---------- */
 
 	async toggleTask(task: TodoTask): Promise<void> {
-		const content = await this.app.vault.read(task.file);
-		const lines = content.split("\n");
-		const line = lines[task.line];
-
-		const newChecked = !task.checked;
-		const newLine = line.replace(
-			/(\s*[-*]\s+\[)[ xX](\])/,
-			`$1${newChecked ? "x" : " "}$2`
+		const lines = (await this.app.vault.read(task.file)).split("\n");
+		const re = /(\s*[-*]\s+\[)[ xX](\])/;
+		if (task.line >= lines.length || !re.test(lines[task.line])) {
+			new Notice("笔记内容有变动，已为你刷新");
+			await this.refreshTasks();
+			return;
+		}
+		lines[task.line] = lines[task.line].replace(
+			re,
+			`$1${task.checked ? " " : "x"}$2`
 		);
-		lines[task.line] = newLine;
-
 		await this.app.vault.modify(task.file, lines.join("\n"));
 		await this.refreshTasks();
 	}
 
+	async updateTask(
+		old: TodoTask,
+		next: TaskDraft
+	): Promise<void> {
+		const lines = (await this.app.vault.read(old.file)).split("\n");
+		const replacement = buildTaskLines({
+			...next,
+			checked: old.checked,
+			indent: old.indent,
+		});
+		lines.splice(old.line, old.endLine - old.line + 1, ...replacement);
+		await this.app.vault.modify(old.file, lines.join("\n"));
+		new Notice("已保存修改");
+		await this.refreshTasks();
+	}
+
+	async deleteTask(task: TodoTask): Promise<void> {
+		const lines = (await this.app.vault.read(task.file)).split("\n");
+		lines.splice(task.line, task.endLine - task.line + 1);
+		await this.app.vault.modify(task.file, lines.join("\n"));
+		new Notice("已删除任务");
+		await this.refreshTasks();
+	}
+
 	private openTaskFile(task: TodoTask): void {
-		const leaf = this.app.workspace.getLeaf(false);
-		leaf.openFile(task.file, {
-			eState: {
-				line: task.line,
-			},
+		this.app.workspace.getLeaf(false).openFile(task.file, {
+			eState: { line: task.line },
 		});
 	}
 }

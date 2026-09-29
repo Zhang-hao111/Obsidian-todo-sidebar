@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-todo-sidebar",
-	"version": "1.0.0",
+	"version": "2.0.0",
 	"description": "A sidebar panel that shows all your vault's todo tasks.",
 	"main": "main.js",
 	"scripts": {

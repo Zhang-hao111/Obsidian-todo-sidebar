@@ -23,6 +23,7 @@ const context = await esbuild.context({
 	],
 	format: "cjs",
 	target: "es2021",
+	charset: "utf8",
 	logLevel: "info",
 	sourcemap: prod ? false : "inline",
 	treeShaking: true,
